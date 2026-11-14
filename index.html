@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <meta name="theme-color" content="#06b6d4" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
+    <meta name="apple-mobile-web-app-title" content="Echo Grid" />
+    <title>Echo Grid — Time-Loop Puzzle</title>
+    <link rel="manifest" href="manifest.json" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20viewBox=%270%200%20100%20100%27%3E%3Ctext%20y=%27.9em%27%20font-size=%2790%27%3E%E2%8F%B3%3C/text%3E%3C/svg%3E"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <!-- Full-Screen Particle Effects Canvas -->
+    <canvas id="fx-canvas" class="fx-canvas"></canvas>
+
+    <!-- INTERACTIVE FLOATING TUTORIAL OVERLAY LAYER -->
+    <div id="tutorial-layer" class="tutorial-layer hidden" aria-live="polite">
+      <div id="tutorial-ring" class="tutorial-ring"></div>
+
+      <div id="tutorial-card" class="tutorial-card">
+        <div class="tutorial-card-header">
+          <span id="tutorial-tag" class="tutorial-tag">🆕 NEW MECHANIC</span>
+          <span id="tutorial-step-badge" class="tutorial-step-badge"
+            >STEP 1 / 3</span
+          >
+          <button
+            id="btn-skip-tutorial"
+            class="tutorial-skip-btn"
+            title="Dismiss Tutorial"
+          >
+            Skip ✕
+          </button>
+        </div>
+        <h3 id="tutorial-title" class="tutorial-title">Time-Loop Basics</h3>
+        <p id="tutorial-text" class="tutorial-text">
+          Walk your gold bot onto Switch S1.
+        </p>
+      </div>
+    </div>
+
+    <main id="game-shell" class="game-shell">
+      <!-- LEFT / TOP: Interactive Puzzle Board Stage -->
+      <section class="board-stage">
+        <div class="board-wrapper">
+          <div
+            id="grid-board"
+            class="grid-board"
+            aria-label="Puzzle Grid"
+          ></div>
+        </div>
+      </section>
+
+      <!-- RIGHT / BOTTOM: Chrono Command Deck (HUD & Controls) -->
+      <aside class="command-deck">
+        <!-- Top Header & Navigation Pills -->
+        <header class="hud-header">
+          <div class="title-row">
+            <div class="brand-group">
+              <span class="brand-orb"></span>
+              <h1>ECHO GRID</h1>
+            </div>
+            <div class="pill-group">
+              <button
+                id="btn-tutorial"
+                class="icon-pill guide-pill"
+                title="Replay Interactive Tutorial (Shortcut: T)"
+              >
+                🎓 Guide
+              </button>
+              <button
+                id="btn-hint"
+                class="icon-pill hint-pill"
+                title="Get a Smart Gameplay Hint (Shortcut: H)"
+              >
+                💡 Hint (2)
+              </button>
+              <button
+                id="btn-sound"
+                class="icon-pill"
+                title="Toggle Sound Effects"
+              >
+                🔊
+              </button>
+              <button
+                id="btn-levels"
+                class="icon-pill levels-pill"
+                title="Open Level Select"
+              >
+                🗺️ Levels
+              </button>
+            </div>
+          </div>
+
+          <div class="subtitle-row">
+            <div>
+              <span id="level-badge" class="badge">LEVEL 1</span>
+              <h2 id="level-title" class="level-title">Echo Recon</h2>
+            </div>
+            <div
+              id="level-stars-display"
+              class="level-stars"
+              title="Best Star Rating"
+            >
+              ☆☆☆
+            </div>
+          </div>
+
+          <p id="level-hint" class="level-hint">
+            Walk onto Switch S1, tap "Lock Loop & Rewind", then head UP to the
+            Portal!
+          </p>
+        </header>
+
+        <!-- Live Telemetry Counters -->
+        <section class="hud-stats">
+          <div class="stat-card">
+            <span class="stat-label">MOVES LEFT</span>
+            <span id="moves-left" class="stat-value">6</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">ECHO CLONES</span>
+            <span id="echoes-used" class="stat-value">0 / 1</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">PORTAL GATE</span>
+            <span id="portal-status" class="stat-value locked">LOCKED</span>
+          </div>
+        </section>
+
+        <!-- Live Smart Hint / Paradox Alert Banner -->
+        <div id="toast-alert" class="toast-alert hidden"></div>
+
+        <!-- Action Bar (Wait / Rewind / Reset) -->
+        <section class="action-bar">
+          <button
+            id="btn-wait"
+            class="btn btn-secondary"
+            title="Shortcut: Spacebar"
+          >
+            ⏳ Wait Turn
+          </button>
+          <button id="btn-rewind" class="btn btn-primary" title="Shortcut: R">
+            ⏪ Lock Loop & Rewind
+          </button>
+          <button
+            id="btn-reset"
+            class="btn btn-danger"
+            title="Shortcut: Escape"
+          >
+            🔄 Reset
+          </button>
+        </section>
+
+        <!-- Arcade D-Pad Controls -->
+        <section class="dpad-container" aria-label="Movement Controls">
+          <button class="dpad-btn up" data-dir="UP" aria-label="Move Up">
+            ▲
+          </button>
+          <div class="dpad-middle">
+            <button
+              class="dpad-btn left"
+              data-dir="LEFT"
+              aria-label="Move Left"
+            >
+              ◀
+            </button>
+            <button
+              class="dpad-btn down"
+              data-dir="DOWN"
+              aria-label="Move Down"
+            >
+              ▼
+            </button>
+            <button
+              class="dpad-btn right"
+              data-dir="RIGHT"
+              aria-label="Move Right"
+            >
+              ▶
+            </button>
+          </div>
+        </section>
+      </aside>
+    </main>
+
+    <!-- 1. VICTORY POP-UP MODAL (3 Stars + Menu / Replay / Next Level) -->
+    <div
+      id="victory-modal"
+      class="modal-overlay hidden"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div class="modal-card victory-card">
+        <div class="victory-badge">TIMELINE SYNCED!</div>
+        <h2 id="victory-level-name" class="victory-title">Level Complete</h2>
+
+        <div id="victory-stars" class="victory-stars">
+          <span class="star-slot">★</span>
+          <span class="star-slot">★</span>
+          <span class="star-slot">★</span>
+        </div>
+
+        <p id="victory-summary" class="victory-summary">
+          Completed in 4 moves! Next stage unlocked.
+        </p>
+
+        <div class="victory-actions">
+          <button id="btn-win-menu" class="btn btn-secondary">🏠 Menu</button>
+          <button id="btn-win-replay" class="btn btn-warning">🔄 Replay</button>
+          <button id="btn-win-next" class="btn btn-accent">
+            ⏭️ Next Level
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. OUT OF MOVES POP-UP MODAL (Rewarded Ad +3 Moves / Retry / Smart Hint) -->
+    <div
+      id="gameover-modal"
+      class="modal-overlay hidden"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div class="modal-card gameover-card">
+        <div class="gameover-badge">⚠️ TIMELINE EXHAUSTED</div>
+        <div class="gameover-icon">⏳</div>
+        <h2 class="gameover-title">Out of Moves!</h2>
+        <p id="gameover-summary" class="victory-summary">
+          You ran out of moves before reaching the unlocked EXIT Portal.
+        </p>
+
+        <!-- Primary Rewarded Ad Rescue Button -->
+        <button id="btn-fail-ad-moves" class="btn btn-ad full-width-btn">
+          🎬 Watch Ad for +3 Moves
+        </button>
+
+        <div id="gameover-actions" class="gameover-actions">
+          <button id="btn-fail-retry" class="btn btn-danger">
+            🔄 Retry Level
+          </button>
+          <button id="btn-fail-hint" class="btn btn-warning">
+            🎬 Watch Ad for Hint
+          </button>
+          <button id="btn-fail-rewind" class="btn btn-primary hidden">
+            ⏪ Lock & Rewind
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. LEVEL SELECT MENU MODAL (5 Cards Per Row) -->
+    <div
+      id="level-modal"
+      class="modal-overlay hidden"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div class="modal-card levels-modal-card">
+        <div class="modal-header">
+          <div>
+            <h2>MISSION SELECT</h2>
+            <p id="total-stars-label" class="modal-subtitle">
+              Total Stars: ★ 0
+            </p>
+          </div>
+          <button id="btn-close-modal" class="btn-close" aria-label="Close">
+            ✕
+          </button>
+        </div>
+
+        <p id="menu-unlock-banner" class="menu-unlock-banner hidden">
+          🔓 New Stage Unlocked! Tap the glowing card below to play.
+        </p>
+
+        <div id="level-grid" class="level-grid"></div>
+      </div>
+    </div>
+
+    <!-- 4. REWARDED VIDEO AD SIMULATOR MODAL (AdMob / Poki SDK Ready) -->
+    <div
+      id="reward-ad-modal"
+      class="modal-overlay hidden"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div class="modal-card reward-ad-card">
+        <div class="reward-ad-topbar">
+          <span class="ad-sponsor-pill">🎬 SPONSORED REWARD VIDEO</span>
+          <span id="ad-timer-badge" class="ad-timer-badge">Reward in 5s</span>
+        </div>
+
+        <div class="reward-ad-stage">
+          <div class="ad-Animated-logo">⚡</div>
+          <h3 id="ad-headline" class="ad-headline">
+            Unlocking Your Chrono Boost...
+          </h3>
+          <p id="ad-subtext" class="ad-subtext">
+            Watching a short sponsored clip to grant your in-game reward.
+          </p>
+          <div class="ad-progress-track">
+            <div id="ad-progress-fill" class="ad-progress-fill"></div>
+          </div>
+        </div>
+
+        <div class="reward-ad-footer">
+          <button id="btn-cancel-ad" class="btn btn-secondary">
+            ✕ Cancel Ad
+          </button>
+          <button id="btn-claim-ad" class="btn btn-accent" disabled>
+            ⏳ Watching Ad (5s)...
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script src="script.js"></script>
+    <script>
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker.register("./sw.js").catch((err) => {
+            console.warn("Service Worker registration skipped:", err);
+          });
+        });
+      }
+    </script>
+  </body>
+</html>
