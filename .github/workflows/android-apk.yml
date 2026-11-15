@@ -1,0 +1,49 @@
+name: Build Echo Grid Android APK
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 1. Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 2. Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: 3. Set up Java JDK 21 (Required for Capacitor Android)
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "21"
+
+      - name: 4. Install Node Dependencies
+        run: npm install
+
+      - name: 5. Prepare www Assets & Sync Capacitor Android
+        run: |
+          mkdir -p www
+          cp index.html style.css script.js manifest.json sw.js *.png www/
+          npx cap sync android
+
+      - name: 6. Grant Execute Permission to Gradlew
+        run: chmod +x android/gradlew
+
+      - name: 7. Compile Android Debug APK
+        run: |
+          cd android
+          ./gradlew assembleDebug
+
+      - name: 8. Upload Installable APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Echo-Grid-Android-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk

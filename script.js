@@ -1,14 +1,29 @@
 /**
- * ECHO GRID - Monetization & PWA Ready Edition
+ * ECHO GRID - Capacitor Android & Google AdMob Ready Edition
  * Features:
- * 1. Collision-Aware Floating Tutorial Positioning (Never covers the Player Bot!)
- * 2. Rewarded Video Ad Simulator (`🎬 Watch Ad for +3 Moves` & `🎬 Watch Ad for Hint`)
+ * 1. Hybrid Google AdMob Native Bridge + Web Simulator Fallback (`ADMOB_CONFIG`)
+ *    - Supports Rewarded Video Ads (+3 Moves & Smart Hint) + Interstitial Ads every 3 levels
+ * 2. Collision-Aware Floating Tutorial Positioning (Never covers the Player Bot)
  * 3. 5-Cards-Per-Row Mission Select Grid
  * 4. Out-of-Moves Pop-up Modal with Ad Rescue, Retry, Smart Hint & Rewind Safeguard
  * 5. 100% Procedural Level Generator (Levels 1 to Infinity) with BFS Solvability Solver
  */
 
 const LEVELS = [];
+
+/**
+ * GOOGLE ADMOB CONFIGURATION
+ * Uses Google's official Android demo ad unit IDs while `isTesting: true`.
+ * When you publish to Play Store, replace the IDs below with your real AdMob Unit IDs
+ * and set `isTesting: false`.
+ */
+const ADMOB_CONFIG = {
+  isTesting: true,
+  rewardedMovesAdUnitId: "ca-app-pub-3940256099942544/5224354917",
+  rewardedHintAdUnitId: "ca-app-pub-3940256099942544/5224354917",
+  interstitialAdUnitId: "ca-app-pub-3940256099942544/1033173712",
+  interstitialFrequency: 3,
+};
 
 /**
  * EXTENSIBLE TUTORIAL REGISTRY
@@ -513,11 +528,65 @@ const state = {
   freeHints: parseInt(localStorage.getItem("echoGrid_freeHints") ?? "2", 10),
   pendingAdReward: null,
   adIntervalId: null,
+  adMobInitialized: false,
+  levelsCompletedSession: 0,
   completedTutorials: JSON.parse(
     localStorage.getItem("echoGrid_tutorials") || "{}",
   ),
   starsByLevel: JSON.parse(localStorage.getItem("echoGrid_stars") || "{}"),
 };
+
+// Detect Native Capacitor AdMob Plugin if running inside Android / iOS App
+function getNativeAdMobPlugin() {
+  if (
+    window.Capacitor &&
+    typeof window.Capacitor.isNativePlatform === "function" &&
+    window.Capacitor.isNativePlatform() &&
+    window.Capacitor.Plugins &&
+    window.Capacitor.Plugins.AdMob
+  ) {
+    return window.Capacitor.Plugins.AdMob;
+  }
+  return null;
+}
+
+async function initNativeAdMob() {
+  const AdMob = getNativeAdMobPlugin();
+  if (!AdMob || state.adMobInitialized) return;
+  try {
+    await AdMob.initialize({
+      initializeForTesting: ADMOB_CONFIG.isTesting,
+    });
+    state.adMobInitialized = true;
+  } catch (err) {
+    console.warn("AdMob initialization skipped or offline:", err);
+  }
+}
+
+async function maybeShowInterstitialAd() {
+  state.levelsCompletedSession += 1;
+  // Never interrupt tutorial levels (Levels 1-4); show every 3rd completed level afterwards
+  if (
+    state.levelIndex < 4 ||
+    state.levelsCompletedSession % ADMOB_CONFIG.interstitialFrequency !== 0
+  ) {
+    return;
+  }
+
+  const AdMob = getNativeAdMobPlugin();
+  if (!AdMob) return;
+
+  try {
+    await initNativeAdMob();
+    await AdMob.prepareInterstitial({
+      adId: ADMOB_CONFIG.interstitialAdUnitId,
+      isTesting: ADMOB_CONFIG.isTesting,
+    });
+    await AdMob.showInterstitial();
+  } catch (err) {
+    console.warn("Interstitial ad skipped:", err);
+  }
+}
 
 // Strict Sequential Progression
 function getHighestUnlockedIndex() {
@@ -815,13 +884,40 @@ function updateHintButtonsUI() {
 }
 
 /**
- * REWARDED VIDEO AD ENGINE (Simulated + AdMob Capacitor Ready)
+ * HYBRID REWARDED VIDEO AD ENGINE
+ * 1. If running in Native Android/iOS Capacitor App -> Calls Google AdMob Rewarded Video API
+ * 2. If running on Web (GitHub Pages / Live Server) -> Runs 5-second HTML5 Ad Simulator
  * @param {"MOVES" | "HINT"} rewardType
  */
-function startRewardedAd(rewardType) {
+async function startRewardedAd(rewardType) {
   state.pendingAdReward = rewardType;
   tutorialLayer.classList.add("hidden");
 
+  const AdMob = getNativeAdMobPlugin();
+  if (AdMob) {
+    try {
+      await initNativeAdMob();
+      const adUnitId =
+        rewardType === "MOVES"
+          ? ADMOB_CONFIG.rewardedMovesAdUnitId
+          : ADMOB_CONFIG.rewardedHintAdUnitId;
+
+      await AdMob.prepareRewardVideoAd({
+        adId: adUnitId,
+        isTesting: ADMOB_CONFIG.isTesting,
+      });
+
+      const rewardItem = await AdMob.showRewardVideoAd();
+      if (rewardItem) {
+        claimAdReward();
+      }
+      return;
+    } catch (err) {
+      console.warn("Native AdMob unavailable, using fallback simulator:", err);
+    }
+  }
+
+  // Web & Offline Fallback: 5-second Interactive Rewarded Video Simulator
   if (rewardType === "MOVES") {
     adHeadline.textContent = "🎬 Reward: +3 Extra Moves";
     adSubtext.textContent =
@@ -902,7 +998,6 @@ function rectsOverlap(r1, r2, margin = 8) {
 
 /**
  * COLLISION-AWARE FLOATING TUTORIAL ENGINE
- * Guarantees `#tutorial-card` never covers the gold Player Bot or the spotlight target.
  */
 function updateFloatingTutorialPosition() {
   if (
@@ -959,7 +1054,6 @@ function updateFloatingTutorialPosition() {
   tutorialRing.style.width = `${rect.width + pad * 2}px`;
   tutorialRing.style.height = `${rect.height + pad * 2}px`;
 
-  // Measure the Player Bot tile & Board rect so the card never covers the Player Bot
   const playerTileEl =
     gridBoard.children[state.playerPos.r * level.gridSize + state.playerPos.c];
   const playerRect = playerTileEl ? playerTileEl.getBoundingClientRect() : null;
@@ -974,7 +1068,6 @@ function updateFloatingTutorialPosition() {
     Math.min(cardLeft, window.innerWidth - cardWidth - 12),
   );
 
-  // Candidate Y positions: Above Target, Top of Board, Below Target, Bottom of Board
   const aboveTop = rect.top - cardHeight - 38;
   const belowTop = rect.bottom + 14;
   const topBoardY = Math.max(12, boardRect.top + 8);
@@ -983,7 +1076,6 @@ function updateFloatingTutorialPosition() {
     boardRect.bottom - cardHeight - 8,
   );
 
-  // Prefer placing ABOVE when the target is on the lower half of the board (rows 2–4)
   const preferAbove = targetInfo.type === "tile" && targetInfo.r >= 2;
   const candidateYs = preferAbove
     ? [aboveTop, topBoardY, belowTop, bottomBoardY]
@@ -1730,8 +1822,9 @@ btnWinReplay.addEventListener("click", () => {
   initLevel(state.levelIndex);
 });
 
-btnWinNext.addEventListener("click", () => {
+btnWinNext.addEventListener("click", async () => {
   victoryModal.classList.add("hidden");
+  await maybeShowInterstitialAd();
   const unlockedIdx = state.levelIndex + 1;
   openLevelModal(unlockedIdx);
 });
@@ -1846,7 +1939,8 @@ gridBoard.addEventListener(
   { passive: true },
 );
 
-// Boot the game at the highest valid unlocked level
+// Initialize Native AdMob on load (if running in Capacitor) and boot game
+initNativeAdMob();
 const savedLevel = parseInt(localStorage.getItem("echoGrid_savedLevel"), 10);
 const maxAllowed = getHighestUnlockedIndex();
 initLevel(

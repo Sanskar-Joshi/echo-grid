@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Echo Grid</string>
+    <string name="title_activity_main">Echo Grid</string>
+    <string name="package_name">com.sanskarjoshi.echogrid</string>
+    <string name="custom_url_scheme">com.sanskarjoshi.echogrid</string>
+</resources>
