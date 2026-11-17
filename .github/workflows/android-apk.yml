@@ -1,4 +1,4 @@
-name: Build Echo Grid Android APK
+name: Build Echo Grid Android APK & Play Store AAB
 
 on:
   push:
@@ -37,13 +37,38 @@ jobs:
       - name: 6. Grant Execute Permission to Gradlew
         run: chmod +x android/gradlew
 
-      - name: 7. Compile Android Debug APK
+      - name: 7. Sign & Compile Play Store Bundle (.aab) + Debug APK
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'EchoGrid2026!' }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'echogrid' }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'EchoGrid2026!' }}
         run: |
+          mkdir -p release-output
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/upload-keystore.jks"
+          else
+            keytool -genkeypair -v \
+              -keystore "$RUNNER_TEMP/upload-keystore.jks" \
+              -storetype PKCS12 \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -alias "$KEY_ALIAS" \
+              -storepass "$KEYSTORE_PASSWORD" \
+              -keypass "$KEY_PASSWORD" \
+              -dname "CN=Sanskar Joshi, OU=GameDev, O=SanskarJoshi, L=Ambaji, S=Gujarat, C=IN"
+            cp "$RUNNER_TEMP/upload-keystore.jks" release-output/upload-keystore.jks
+            base64 -w 0 "$RUNNER_TEMP/upload-keystore.jks" > release-output/KEYSTORE_BASE64.txt
+          fi
+          export KEYSTORE_FILE="$RUNNER_TEMP/upload-keystore.jks"
           cd android
-          ./gradlew assembleDebug
+          ./gradlew assembleDebug bundleRelease
+          cp app/build/outputs/apk/debug/app-debug.apk ../release-output/Echo-Grid-Debug.apk
+          cp app/build/outputs/bundle/release/app-release.aab ../release-output/Echo-Grid-PlayStore-Release.aab
 
-      - name: 8. Upload Installable APK Artifact
+      - name: 8. Upload Play Store Bundle (.aab) & APK Artifact
         uses: actions/upload-artifact@v6
         with:
-          name: Echo-Grid-Android-APK
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: Echo-Grid-PlayStore-Bundle
+          path: release-output/

@@ -1,4 +1,8 @@
 node_modules/
 www/
+release-output/
+*.jks
+*.keystore
+KEYSTORE_BASE64.txt
 .DS_Store
 *.log
