@@ -18,10 +18,10 @@ const LEVELS = [];
  * and set `isTesting: false`.
  */
 const ADMOB_CONFIG = {
-  isTesting: true,
-  rewardedMovesAdUnitId: "ca-app-pub-3940256099942544/5224354917",
-  rewardedHintAdUnitId: "ca-app-pub-3940256099942544/5224354917",
-  interstitialAdUnitId: "ca-app-pub-3940256099942544/1033173712",
+  isTesting: false,
+  rewardedMovesAdUnitId: "ca-app-pub-8114131584556922/7242477331",
+  rewardedHintAdUnitId: "ca-app-pub-811413584556922/7611189174",
+  interstitialAdUnitId: "ca-app-pub-8114131584556922/6338083066",
   interstitialFrequency: 3,
 };
 
