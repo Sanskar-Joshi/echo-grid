@@ -6,3 +6,4 @@ release-output/
 KEYSTORE_BASE64.txt
 .DS_Store
 *.log
+playstore-media/
